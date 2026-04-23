@@ -1,6 +1,5 @@
-import os
-import time
 import json
+import time
 import requests
 
 CATEGORY = "Agrant/Seedance"
@@ -25,7 +24,7 @@ class SeedanceVideoGenerator:
                 "auth_token":   ("STRING", {"default": ""}),
                 "model":        (list(MODEL_OPTIONS.keys()),),
                 "prompt":       ("STRING", {"multiline": True, "default": ""}),
-                "resolution":   (["720p", "480p"],),
+                "resolution":   (["1080P", "720p", "480p"],),
                 "ratio":        (["16:9", "9:16", "1:1"],),
                 "duration":     ("INT", {"default": 8, "min": 4, "max": 15}),
             },
@@ -54,9 +53,14 @@ class SeedanceVideoGenerator:
                  generate_audio=True, watermark=False,
                  poll_interval=5, timeout_seconds=600):
 
+        normalized_resolution = "1080P" if str(resolution).lower() == "1080p" else resolution
+
+        if model == "seedance-2.0-fast" and normalized_resolution == "1080P":
+            raise ValueError("1080p is only supported for model seedance-2.0")
+
         base = api_base_url.rstrip("/")
         submit_url = f"{base}/model/video/task"
-        query_url  = f"{base}/model/video/result"
+        query_url = f"{base}/model/video/result"
 
         headers = {
             "Authorization": auth_token.strip(),
@@ -97,17 +101,20 @@ class SeedanceVideoGenerator:
                 "role": "reference_audio",
             })
 
+        if not content:
+            raise ValueError("至少需要提供 prompt 或任一参考素材 URL，content 不能为空")
+
         payload = {
-            "modelId":       MODEL_OPTIONS[model],
-            "resolution":    resolution,
-            "ratio":         ratio,
-            "duration":      duration,
+            "modelId": MODEL_OPTIONS[model],
+            "resolution": normalized_resolution,
+            "ratio": ratio,
+            "duration": duration,
             "generateAudio": generate_audio,
-            "watermark":     watermark,
-            "content":       content,
+            "watermark": watermark,
+            "content": content,
         }
 
-        print(f"[Seedance] 提交任务 → {submit_url}")
+        print(f"[Seedance] 提交任务 -> {submit_url}")
         print(f"[Seedance] content: {json.dumps(content, ensure_ascii=False)}")
         print(f"[Seedance] 请求体: {json.dumps(payload, ensure_ascii=False)}")
 
@@ -138,9 +145,31 @@ class SeedanceVideoGenerator:
                 video_url = result["data"]["videoUrl"]
                 print(f"[Seedance] 完成！视频 URL: {video_url}")
                 return (video_url,)
-            elif status == -1:
-                raise RuntimeError(f"[Seedance] 视频生成失败（服务端 status=-1）| 完整响应: {result}")
-            elif status == -2:
+            if status == -1:
+                data = result.get("data") or {}
+                fail_reason = (
+                    data.get("failReason")
+                    or data.get("errorMsg")
+                    or data.get("reason")
+                    or data.get("message")
+                    or result.get("msg")
+                )
+                debug_meta = {
+                    "taskId": task_id,
+                    "model": model,
+                    "modelId": MODEL_OPTIONS.get(model),
+                    "resolution": normalized_resolution,
+                    "ratio": ratio,
+                    "duration": duration,
+                    "content_count": len(content),
+                }
+                raise RuntimeError(
+                    f"[Seedance] 视频生成失败（服务端 status=-1）"
+                    f" | fail_reason={fail_reason}"
+                    f" | debug={debug_meta}"
+                    f" | 完整响应: {result}"
+                )
+            if status == -2:
                 raise RuntimeError("[Seedance] 任务已被删除（status=-2）")
 
         raise RuntimeError(f"[Seedance] 超时（{timeout_seconds}s 内未完成）")
