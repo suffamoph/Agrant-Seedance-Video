@@ -34,6 +34,7 @@ class ArkSeedanceVideoGenerator:
             },
             "optional": {
                 "first_frame_image_url":  ("STRING", {"default": ""}),
+                "last_frame_image_url":   ("STRING", {"default": ""}),
                 "reference_image_urls":   ("STRING", {"default": "", "tooltip": "多个 URL 用英文逗号分隔"}),
                 "reference_video_url":    ("STRING", {"default": ""}),
                 "reference_audio_url":    ("STRING", {"default": ""}),
@@ -49,7 +50,7 @@ class ArkSeedanceVideoGenerator:
 
     def generate(self, api_key, model, prompt, resolution, ratio, duration,
                  generate_audio, watermark,
-                 first_frame_image_url="", reference_image_urls="",
+                 first_frame_image_url="", last_frame_image_url="", reference_image_urls="",
                  reference_video_url="", reference_audio_url="",
                  poll_interval=10, timeout_seconds=900):
 
@@ -68,6 +69,13 @@ class ArkSeedanceVideoGenerator:
                 "type": "image_url",
                 "image_url": {"url": first_frame_image_url.strip()},
                 "role": "first_frame",
+            })
+
+        if last_frame_image_url.strip():
+            content.append({
+                "type": "image_url",
+                "image_url": {"url": last_frame_image_url.strip()},
+                "role": "last_frame",
             })
 
         for url in [u.strip() for u in reference_image_urls.split(",") if u.strip()]:
