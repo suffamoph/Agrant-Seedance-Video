@@ -1,11 +1,12 @@
 import json
 import time
 import requests
+from .token_utils import resolve_token
 
 CATEGORY = "Agrant/Seedance"
 
 MODEL_OPTIONS = {
-    "seedance-2.0": 29,
+    "seedance-2.0": 37,
     "seedance-2.0-fast": 30,
 }
 
@@ -31,7 +32,7 @@ class SeedanceVideoGenerator:
             "optional": {
                 "first_frame_url":      ("STRING", {"default": ""}),
                 "last_frame_url":       ("STRING", {"default": ""}),
-                "reference_image_url":  ("STRING", {"default": ""}),
+                "reference_image_url":  ("STRING", {"default": "", "tooltip": "参考图地址，多张用英文逗号分隔（可接素材上传节点的 asset_url）"}),
                 "reference_video_url":  ("STRING", {"default": ""}),
                 "reference_audio_url":  ("STRING", {"default": ""}),
                 "generate_audio":       ("BOOLEAN", {"default": True}),
@@ -63,7 +64,7 @@ class SeedanceVideoGenerator:
         query_url = f"{base}/model/video/result"
 
         headers = {
-            "Authorization": auth_token.strip(),
+            "Authorization": resolve_token(auth_token),
             "Content-Type": "application/json",
         }
 
@@ -82,10 +83,10 @@ class SeedanceVideoGenerator:
                 "image_url": {"url": last_frame_url.strip()},
                 "role": "last_frame",
             })
-        if reference_image_url.strip():
+        for url in [u.strip() for u in reference_image_url.split(",") if u.strip()]:
             content.append({
                 "type": "image_url",
-                "image_url": {"url": reference_image_url.strip()},
+                "image_url": {"url": url},
                 "role": "reference_image",
             })
         if reference_video_url.strip():
